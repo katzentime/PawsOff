@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PawsOff 🐾</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a0a2e;
+    font-family: 'Nunito', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  /* Starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 20% 50%, #2d0e5e 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, #0e2d5e 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 80%, #3d1a00 0%, transparent 40%);
+    z-index: 0;
+  }
+
+  #gameContainer {
+    position: relative;
+    z-index: 1;
+  }
+
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 780px;
+    margin-bottom: 12px;
+    padding: 0 10px;
+  }
+
+  .hud-box {
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 8px 24px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+  }
+
+  .hud-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .hud-value {
+    font-family: 'Fredoka One', cursive;
+    font-size: 32px;
+    color: #fff;
+    line-height: 1;
+  }
+
+  #scoreVal { color: #ffd700; }
+  #levelVal { color: #a78bfa; }
+  #livesVal { color: #f87171; }
+
+  canvas {
+    display: block;
+    border-radius: 24px;
+    border: 3px solid rgba(255,255,255,0.1);
+    box-shadow: 0 0 60px rgba(167, 139, 250, 0.3), 0 30px 60px rgba(0,0,0,0.5);
+    cursor: crosshair;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    top: 46px;
+    border-radius: 24px;
+    background: rgba(10,5,20,0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.4s;
+  }
+
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .overlay-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 64px;
+    color: #ffd700;
+    text-shadow: 0 0 30px rgba(255,215,0,0.6), 0 4px 0 #a0522d;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+
+  .overlay-sub {
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 40px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .big-paw {
+    font-size: 80px;
+    margin-bottom: 16px;
+    animation: pawBounce 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pawBounce {
+    0%, 100% { transform: translateY(0) rotate(-10deg); }
+    50% { transform: translateY(-15px) rotate(10deg); }
+  }
+
+  .btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 22px;
+    padding: 14px 48px;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    color: #1a0a2e;
+    box-shadow: 0 8px 0 #a05000, 0 12px 30px rgba(255,140,0,0.4);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 11px 0 #a05000, 0 16px 30px rgba(255,140,0,0.5);
+  }
+
+  .btn-primary:active {
+    transform: translateY(2px);
+    box-shadow: 0 4px 0 #a05000;
+  }
+
+  #finalScore {
+    font-family: 'Fredoka One', cursive;
+    font-size: 48px;
+    color: #a78bfa;
+    margin-bottom: 24px;
+  }
+
+  #combo {
+    position: absolute;
+    font-family: 'Fredoka One', cursive;
+    font-size: 28px;
+    color: #ffd700;
+    pointer-events: none;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    transition: none;
+    z-index: 999;
+    top: 46px;
+  }
+
+  .howto {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 32px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    text-align: center;
+  }
+
+  .howto div { max-width: 120px; }
+  .howto .icon { font-size: 28px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <div id="hud">
+    <div class="hud-box">
+      <div class="hud-label">Punkte</div>
+      <div class="hud-value" id="scoreVal">0</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Level</div>
+      <div class="hud-value" id="levelVal">1</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Leben</div>
+      <div class="hud-value" id="livesVal">❤️❤️❤️</div>
+    </div>
+  </div>
+
+  <canvas id="canvas" width="780" height="520"></canvas>
+
+  <div id="overlay">
+    <div class="big-paw">🐾</div>
+    <div class="overlay-title">PawsOff!</div>
+    <div class="overlay-sub">Schütze die Speisen vor den frechen Katzenpfoten!<br>Klicke auf eine Pfote, bevor sie das Essen berührt.</div>
+    <div class="howto">
+      <div><div class="icon">🖱️</div>Auf Pfote klicken</div>
+      <div><div class="icon">✅</div>+10 Punkte</div>
+      <div><div class="icon">❌</div>−1 Leben</div>
+      <div><div class="icon">⚡</div>Wird schneller</div>
+    </div>
+    <button class="btn btn-primary" id="startBtn">Los geht's!</button>
+  </div>
+
+  <div id="combo" style="display:none"></div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('scoreVal');
+const levelEl = document.getElementById('levelVal');
+const livesEl = document.getElementById('livesVal');
+const comboEl = document.getElementById('combo');
+
+const W = canvas.width;
+const H = canvas.height;
+
+// Game state
+let score = 0, lives = 3, level = 1, gameRunning = false;
+let cats = [], particles = [], floatingTexts = [];
+let spawnTimer = 0, spawnInterval = 3000;
+let lastTime = 0;
+let comboCount = 0, comboTimer = 0;
+
+// Table geometry
+const TABLE = {
+  cx: W/2, cy: H/2 - 20,
+  rx: 200, ry: 110
+};
+
+// Food items on table
+const FOODS = [
+  { emoji: '🍕', x: W/2 - 80, y: H/2 - 50 },
+  { emoji: '🍗', x: W/2 + 60, y: H/2 - 60 },
+  { emoji: '🧁', x: W/2, y: H/2 - 30 },
+  { emoji: '🍖', x: W/2 - 40, y: H/2 + 20 },
+  { emoji: '🐟', x: W/2 + 80, y: H/2 + 10 },
+];
+
+// Cat positions around table
+const CAT_POSITIONS = [
+  { angle: 0,    side: 'right'  },
+  { angle: 60,   side: 'right'  },
+  { angle: 120,  side: 'left'   },
+  { angle: 180,  side: 'left'   },
+  { angle: 240,  side: 'left'   },
+  { angle: 300,  side: 'right'  },
+];
+
+const CAT_COLORS = ['#f4845f','#a0522d','#808080','#2f2f2f','#e8c07d','#c8a2c8'];
+const CAT_NAMES  = ['Mimi','Luna','Tiger','Shadow','Biscuit','Lila'];
+
+function getCatBasePos(angle) {
+  const rad = (angle * Math.PI) / 180;
+  const dist = 1.65;
+  return {
+    x: TABLE.cx + Math.cos(rad) * TABLE.rx * dist,
+    y: TABLE.cy + Math.sin(rad) * TABLE.ry * dist * 1.1
+  };
+}
+
+function getTargetFoodPos(catAngle) {
+  // Each cat targets a food somewhat near their side
+  const rad = (catAngle * Math.PI) / 180;
+  return {
+    x: TABLE.cx + Math.cos(rad) * TABLE.rx * 0.5,
+    y: TABLE.cy + Math.sin(rad) * TABLE.ry * 0.4
+  };
+}
+
+class Cat {
+  constructor(index) {
+    this.index = index;
+    const posData = CAT_POSITIONS[index % CAT_POSITIONS.length];
+    this.angle = posData.angle + (Math.random() - 0.5) * 20;
+    this.color = CAT_COLORS[index % CAT_COLORS.length];
+    this.name = CAT_NAMES[index % CAT_NAMES.length];
+    this.base = getCatBasePos(this.angle);
+    this.target = getTargetFoodPos(this.angle);
+    this.x = this.base.x;
+    this.y = this.base.y;
+    this.pawX = this.base.x;
+    this.pawY = this.base.y;
+    this.progress = 0; // 0 = at base, 1 = at food
+    this.speed = this.getSpeed();
+    this.state = 'reaching'; // reaching | retreating | waiting
+    this.waitTimer = 0;
+    this.bobOffset = Math.random() * Math.PI * 2;
+    this.clicked = false;
+    this.alpha = 1;
+  }
+
+  getSpeed() {
+    const base = 0.012 + level * 0.008;
+    return base + Math.random() * 0.006;
+  }
+
+  update(dt) {
+    if (this.clicked) {
+      this.alpha -= dt * 0.003;
+      return this.alpha <= 0;
+    }
+
+    this.bobOffset += dt * 0.002;
+
+    if (this.state === 'reaching') {
+      this.progress += this.speed * (dt / 16);
+      if (this.progress >= 1) {
+        this.progress = 1;
+        // Cat stole food!
+        this.onFoodStolen();
+        return true; // remove cat
+      }
+    }
+
+    const t = this.progress;
+    // Easing
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+    this.pawX = this.base.x + (this.target.x - this.base.x) * ease;
+    this.pawY = this.base.y + (this.target.y - this.base.y) * ease;
+
+    // Bob
+    const perp = { x: -(this.target.y - this.base.y), y: this.target.x - this.base.x };
+    const len = Math.sqrt(perp.x**2 + perp.y**2) || 1;
+    const bob = Math.sin(this.bobOffset) * 5;
+    this.pawX += (perp.x / len) * bob;
+    this.pawY += (perp.y / len) * bob;
+
+    return false;
+  }
+
+  onFoodStolen() {
+    lives = Math.max(0, lives - 1);
+    updateHUD();
+    spawnParticles(this.target.x, this.target.y, '#f87171', 8);
+    addFloatingText(this.target.x, this.target.y - 30, '-1 Leben 😿', '#f87171');
+    comboCount = 0;
+    if (lives <= 0) endGame();
+  }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+
+    const bodyX = this.base.x;
+    const bodyY = this.base.y;
+
+    // Draw paw/arm reaching
+    const dx = this.pawX - bodyX;
+    const dy = this.pawY - bodyY;
+
+    // Arm
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bodyX, bodyY - 5);
+    // Slight curve
+    const mid = { x: (bodyX + this.pawX) / 2 - dy * 0.15, y: (bodyY + this.pawY) / 2 + dx * 0.15 };
+    ctx.quadraticCurveTo(mid.x, mid.y, this.pawX, this.pawY);
+    ctx.stroke();
+
+    // Cat body (simple, cute)
+    this.drawCatBody(bodyX, bodyY);
+
+    // Paw at tip
+    this.drawPaw(this.pawX, this.pawY);
+
+    // Danger bar
+    if (!this.clicked) {
+      const barW = 48;
+      const barH = 6;
+      const bx = bodyX - barW/2;
+      const by = bodyY - 62;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, barW, barH, 3);
+      ctx.fill();
+      const danger = this.progress;
+      const col = danger < 0.5 ? `hsl(${120-danger*240},90%,55%)` : `hsl(${120-danger*240},90%,55%)`;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, barW * danger, barH, 3);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  drawCatBody(x, y) {
+    const r = 22;
+    // Body
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Ears
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.moveTo(x - 14, y - 16);
+    ctx.lineTo(x - 22, y - 32);
+    ctx.lineTo(x - 6, y - 24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 14, y - 16);
+    ctx.lineTo(x + 22, y - 32);
+    ctx.lineTo(x + 6, y - 24);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner ears
+    ctx.fillStyle = 'rgba(255,150,150,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(x - 13, y - 18);
+    ctx.lineTo(x - 19, y - 28);
+    ctx.lineTo(x - 8, y - 23);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 13, y - 18);
+    ctx.lineTo(x + 19, y - 28);
+    ctx.lineTo(x + 8, y - 23);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eyes
+    const eyeY = y - 5;
+    const blink = Math.sin(this.bobOffset * 0.3) > 0.95;
+    if (blink) {
+      ctx.strokeStyle = '#1a0a2e';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x-9, eyeY); ctx.lineTo(x-5, eyeY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+5, eyeY); ctx.lineTo(x+9, eyeY); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#1a0a2e';
+      ctx.beginPath(); ctx.ellipse(x-7, eyeY, 5, 6, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x+7, eyeY, 5, 6, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath(); ctx.arc(x-5, eyeY-2, 2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+9, eyeY-2, 2, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Nose & mouth
+    ctx.fillStyle = '#ffb6c1';
+    ctx.beginPath(); ctx.arc(x, y+5, 3, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#1a0a2e'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y+8); ctx.lineTo(x-5, y+12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y+8); ctx.lineTo(x+5, y+12); ctx.stroke();
+
+    // Whiskers
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+    for (let s of [-1,1]) {
+      ctx.beginPath(); ctx.moveTo(x + s*r*0.3, y+3); ctx.lineTo(x + s*r*1.4, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + s*r*0.3, y+6); ctx.lineTo(x + s*r*1.4, y+5); ctx.stroke();
+    }
+  }
+
+  drawPaw(x, y) {
+    const pulse = 1 + Math.sin(this.bobOffset * 2) * 0.08 * this.progress;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(pulse, pulse);
+
+    // Paw pad
+    ctx.fillStyle = this.color;
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath(); ctx.arc(0, 2, 8, 0, Math.PI); ctx.fill();
+
+    // Toes
+    const toePositions = [[-8,-10],[0,-13],[8,-10]];
+    toePositions.forEach(([tx,ty]) => {
+      ctx.fillStyle = this.color;
+      ctx.beginPath(); ctx.arc(tx, ty, 5.5, 0, Math.PI*2); ctx.fill();
+    });
+
+    // Claws
+    if (this.progress > 0.6) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 1.5;
+      toePositions.forEach(([tx,ty]) => {
+        ctx.beginPath();
+        ctx.moveTo(tx, ty-4);
+        ctx.lineTo(tx, ty-10);
+        ctx.stroke();
+      });
+    }
+
+    ctx.restore();
+  }
+
+  isHit(mx, my) {
+    const d = Math.hypot(mx - this.pawX, my - this.pawY);
+    const db = Math.hypot(mx - this.base.x, my - this.base.y);
+    return d < 28 || db < 28;
+  }
+}
+
+class Particle {
+  constructor(x, y, color) {
+    this.x = x; this.y = y; this.color = color;
+    this.vx = (Math.random()-0.5)*6;
+    this.vy = (Math.random()-0.5)*6 - 2;
+    this.life = 1;
+    this.r = 4 + Math.random()*4;
+  }
+  update(dt) {
+    this.x += this.vx*(dt/16);
+    this.y += this.vy*(dt/16);
+    this.vy += 0.15*(dt/16);
+    this.life -= 0.025*(dt/16);
+    return this.life <= 0;
+  }
+  draw() {
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r*this.life, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+class FloatingText {
+  constructor(x, y, text, color) {
+    this.x = x; this.y = y; this.text = text; this.color = color;
+    this.life = 1;
+    this.vy = -1.5;
+  }
+  update(dt) {
+    this.y += this.vy*(dt/16);
+    this.life -= 0.02*(dt/16);
+    return this.life <= 0;
+  }
+  draw() {
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.font = 'bold 20px Nunito';
+    ctx.textAlign = 'center';
+    ctx.fillText(this.text, this.x, this.y);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) particles.push(new Particle(x, y, color));
+}
+
+function addFloatingText(x, y, text, color) {
+  floatingTexts.push(new FloatingText(x, y, text, color));
+}
+
+function updateHUD() {
+  scoreEl.textContent = score;
+  levelEl.textContent = level;
+  const h = '❤️'.repeat(Math.max(0, lives));
+  const e = '🖤'.repeat(Math.max(0, 3 - lives));
+  livesEl.textContent = h + e;
+}
+
+function spawnCat() {
+  if (cats.length >= 6) return;
+  // Pick unused index
+  const usedAngles = cats.map(c => c.index);
+  const available = [0,1,2,3,4,5].filter(i => !usedAngles.includes(i));
+  if (available.length === 0) return;
+  const idx = available[Math.floor(Math.random() * available.length)];
+  cats.push(new Cat(idx));
+}
+
+function drawTable() {
+  // Table legs shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(TABLE.cx, TABLE.cy + TABLE.ry + 30, TABLE.rx*0.8, 20, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Table cloth / tablecloth pattern
+  ctx.save();
+  const tableGrad = ctx.createRadialGradient(TABLE.cx, TABLE.cy-20, 10, TABLE.cx, TABLE.cy, TABLE.rx);
+  tableGrad.addColorStop(0, '#e8dcc8');
+  tableGrad.addColorStop(1, '#c4a882');
+  ctx.fillStyle = tableGrad;
+  ctx.beginPath();
+  ctx.ellipse(TABLE.cx, TABLE.cy + 12, TABLE.rx + 10, TABLE.ry + 8, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#b8945e';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Table top
+  const topGrad = ctx.createRadialGradient(TABLE.cx - 40, TABLE.cy - 30, 10, TABLE.cx, TABLE.cy, TABLE.rx);
+  topGrad.addColorStop(0, '#f5efe0');
+  topGrad.addColorStop(1, '#d4b896');
+  ctx.fillStyle = topGrad;
+  ctx.beginPath();
+  ctx.ellipse(TABLE.cx, TABLE.cy, TABLE.rx, TABLE.ry, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#c4a882';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Table pattern rings
+  ctx.strokeStyle = 'rgba(180,140,100,0.3)';
+  ctx.lineWidth = 1;
+  for (let s = 0.7; s < 1; s += 0.15) {
+    ctx.beginPath();
+    ctx.ellipse(TABLE.cx, TABLE.cy, TABLE.rx*s, TABLE.ry*s, 0, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Food items
+  ctx.font = '32px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  FOODS.forEach(f => {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 8;
+    ctx.fillText(f.emoji, f.x, f.y);
+    ctx.restore();
+  });
+}
+
+function drawBackground() {
+  // Cozy room floor
+  const floorGrad = ctx.createLinearGradient(0, H*0.6, 0, H);
+  floorGrad.addColorStop(0, '#2a1a0e');
+  floorGrad.addColorStop(1, '#1a0a04');
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, H*0.6, W, H*0.4);
+
+  // Wall
+  const wallGrad = ctx.createLinearGradient(0, 0, 0, H*0.6);
+  wallGrad.addColorStop(0, '#1e1240');
+  wallGrad.addColorStop(1, '#2d1e0a');
+  ctx.fillStyle = wallGrad;
+  ctx.fillRect(0, 0, W, H*0.6);
+
+  // Floor line
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(0, H*0.6 - 2, W, 4);
+
+  // Subtle stars
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  const starPos = [[30,20],[120,50],[250,15],[400,35],[550,10],[700,45],[760,25]];
+  starPos.forEach(([sx,sy]) => {
+    ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function gameLoop(timestamp) {
+  if (!gameRunning) return;
+  const dt = Math.min(timestamp - lastTime, 50);
+  lastTime = timestamp;
+
+  // Spawn
+  spawnTimer += dt;
+  if (spawnTimer >= spawnInterval) {
+    spawnTimer = 0;
+    spawnCat();
+    // Gradually speed up
+    spawnInterval = Math.max(800, 3000 - score * 8);
+  }
+
+  // Combo timer
+  if (comboCount > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) comboCount = 0;
+  }
+
+  // Update level
+  const newLevel = Math.floor(score / 50) + 1;
+  if (newLevel !== level) { level = newLevel; updateHUD(); }
+
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawTable();
+
+  // Update & draw cats (sorted by y for depth)
+  cats.sort((a, b) => a.base.y - b.base.y);
+  cats = cats.filter(cat => {
+    const done = cat.update(dt);
+    cat.draw();
+    return !done;
+  });
+
+  // Particles
+  ctx.save();
+  particles = particles.filter(p => { const d = p.update(dt); p.draw(); return !d; });
+  ctx.restore();
+
+  // Floating texts
+  ctx.save();
+  floatingTexts = floatingTexts.filter(t => { const d = t.update(dt); t.draw(); return !d; });
+  ctx.textAlign = 'left';
+  ctx.restore();
+
+  requestAnimationFrame(gameLoop);
+}
+
+canvas.addEventListener('click', (e) => {
+  if (!gameRunning) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  let hit = false;
+  for (let cat of cats) {
+    if (!cat.clicked && cat.isHit(mx, my)) {
+      cat.clicked = true;
+      hit = true;
+      comboCount++;
+      comboTimer = 3000;
+
+      const pts = 10 + (comboCount > 1 ? (comboCount - 1) * 5 : 0);
+      score += pts;
+      updateHUD();
+      spawnParticles(cat.pawX, cat.pawY, '#ffd700', 10);
+
+      const msg = comboCount > 2
+        ? `🔥 ${comboCount}x COMBO! +${pts}`
+        : comboCount > 1 ? `⭐ Kombo! +${pts}` : `+${pts}`;
+      addFloatingText(cat.pawX, cat.pawY - 40, msg, '#ffd700');
+      break;
+    }
+  }
+});
+
+function startGame() {
+  score = 0; lives = 3; level = 1;
+  cats = []; particles = []; floatingTexts = [];
+  spawnTimer = 0; spawnInterval = 3000;
+  comboCount = 0; gameRunning = true;
+  updateHUD();
+  overlay.classList.add('hidden');
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+  // Spawn first cat immediately
+  setTimeout(spawnCat, 500);
+}
+
+function endGame() {
+  gameRunning = false;
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `
+    <div style="font-size:60px;margin-bottom:8px">😿</div>
+    <div class="overlay-title" style="font-size:48px">Game Over!</div>
+    <div class="overlay-sub">Die Katzen haben gewonnen...<br>diesmal.</div>
+    <div id="finalScore">🏆 ${score} Punkte</div>
+    <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-bottom:24px">Level ${level} erreicht</div>
+    <button class="btn btn-primary" onclick="startGame()">Nochmal! 🐾</button>
+  `;
+}
+
+startBtn.addEventListener('click', startGame);
+
+// Initial draw
+drawBackground();
+drawTable();
+</script>
+</body>
+</html>
